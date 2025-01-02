@@ -1,0 +1,907 @@
+openapi: 3.0.2
+info:
+  title: Oasys
+  description: |
+    # REST API to monitor and control a ROSS Streak Camera
+
+    ---
+  contact:
+    name: Product Information
+    url: https://sydortechnologies.com/streak-camera/
+    email: kevin.kearney@sydortechnologies.com
+  x-logo:
+    url: "https://www.sydor.com/wp-content/uploads/2019/09/Custom-Optics-Manufacturer-Sydor-d-360x192.png"
+    altText: Sydor logo
+  license:
+    name: Copyright Sydor Technologies 2020
+  version: 0.1.0
+servers:
+  - url: http://oasys:8080
+tags:
+  - name: System OPS
+    description: "High-level control and monitoring commands "
+  - name: Voltages
+    description:
+      Control and monitor Bias, Sweep, Cathode, and Focus voltages as well
+      as Cathode Gating
+  - name: Ramps & Triggers
+    description:
+      Change sweep speed. Also changes the Bias voltages and other ramp parameters.  Set/monitor
+      sweep trigger
+  - name: Imaging Camera
+    description: Configure the CCD/CMOS camera that reads out the ROSS data **(Future)**
+  - name: Modes & Status
+    description: System Status | Mode Control (operate, focus, sync, slow-sweep, diagnostic)
+  - name: Data Channels
+    description: Configure and monitor the Messaging (PUB/SUB) and Image Streaming (UDP/RTP) data channels **(Future)**
+paths:
+  /sysConfig:
+    get:
+      tags:
+        - System OPS
+      summary: GET the configuration state of the streak camera
+      description:
+        Returns a JSON structure showing all available configuration data
+        for the system.  This command, along with `/sysConfig`  and `/sysArm` are
+        all that are normally needed to remotely operate the camera.
+      operationId: get_sysStatus
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/inline_response_200"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: SystemOPS
+    post:
+      tags:
+        - System OPS
+      summary: SET streak camera to a configuration state
+      description:
+        Transmits a JSON structure providing configuration data for the
+        system.  This command, along with `/sysStatus`  and `/sysArm` are all that
+        are normally needed to remotely operate the camera.
+      operationId: set_sysConfig
+      requestBody:
+        description: Optional description in *Markdown*
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/body"
+        required: true
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Result"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: SystemOPS
+  /sysArm/{enable}:
+    post:
+      tags:
+        - System OPS
+      summary: ARM the external trigger
+      description: Set `true` to ARM the system to trigger and `false` to disable
+      operationId: set_sysArm
+      parameters:
+        - $ref: "#/components/parameters/enable"
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Result"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: SystemOPS
+  /sysAbort:
+    post:
+      tags:
+        - System OPS
+      summary: Disarm and orderly shut down
+      description: Set `true` to ARM the system to trigger
+      operationId: set_sysAbort
+      parameters:
+        - name: enable
+          in: query
+          description: "`true` = enable `false` = disable"
+          required: true
+          style: form
+          explode: true
+          schema:
+            type: boolean
+            enum:
+              - true
+              - false
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Result"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: SystemOPS
+  /sysStatus:
+    get:
+      tags:
+        - System OPS
+      summary: Get operational status of the streak camera
+      description:
+        Unlike `/sysConfig`, which manages the entire context of the system,
+        the `/sysStatus` endpoint manages experimental(shot)-related parameters only.  It
+        is designed to provide fast-update status during shot operations.
+      operationId: get_sysStatusX
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/body"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: SystemOPS
+  /voltageEnable:
+    post:
+      tags:
+        - Voltages
+      summary: Enable or Disable the three high voltages (Bias, Sweep, and Cathode)
+      description:
+        Enables (`true`) or Disables (`false`) the three high voltages
+        (Bias, Sweep, and Cathode).  Note that the voltages cannot be enabled/disabled
+        individually, so the query has only a single true/false parameter.  However,
+        other actions **can** affect the individual states, so the query response
+        will show all three HV *enable/disable* states. In this use case they will
+        all be the same.
+      operationId: set_voltageEnable
+      parameters:
+        - name: enable
+          in: query
+          description: "`true` = enable `false` = disable"
+          required: true
+          style: form
+          explode: true
+          schema:
+            type: boolean
+            enum:
+              - true
+              - false
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/voltageEnable"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: Voltages
+  /cathodeGating:
+    post:
+      tags:
+        - Voltages
+      summary: Turn Cathode gating on or off
+      description: The description text
+      operationId: set_cathodeGating
+      parameters:
+        - name: enable
+          in: query
+          description: "`true` = enable `false` = disable"
+          required: true
+          style: form
+          explode: true
+          schema:
+            type: boolean
+            enum:
+              - true
+              - false
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/inline_response_200_1"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: Voltages
+  /voltageStatus:
+    get:
+      tags:
+        - Voltages
+      summary: Get all voltage-related system status values
+      description:
+        Gets the status of voltageEnable, voltageSetFocus, and cathodeGating.  The
+        Example Value Schema for the 200 response documents the results.  Note that
+        the parameter `simMode` = True only when the API has been configured to run
+        in Simulation mode (API mocking)
+      operationId: get_voltageStatus
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/inline_response_200_2"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: Voltages
+  /rampIndex:
+    get:
+      tags:
+        - Ramps & Triggers
+      summary: Look up the rampIndex values
+      description:
+        Allowed sweep speeds are stored in the GEPInit.ini file.  The values
+        are indexed by order of entry in the file, so the first entry is `rampIndex`
+        = 1, and the Nth entry is `rampIndex` = N.  This endpoint returns the information
+        that is used in the `POST /sweepSpeed/{rampIndex}` endpoint
+      operationId: get_rampIndex
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Result"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: RampsTriggers
+  /sweepSpeed/{rampIndex}:
+    post:
+      tags:
+        - Ramps & Triggers
+      summary: Set the sweep speed
+      description:
+        Allowed sweep speeds are stored in the GEPInit.ini file.  In this
+        API release there is no way to look up the actual numeric (time) values.  The
+        values are indexed by order of entry in the file, so the first entry is rampIndex
+        = 1, and the Nth entry is rampIndex = N.
+      operationId: set_sweepSpeed
+      parameters:
+        - name: rampIndex
+          in: path
+          description: Integer from 1 to N
+          required: true
+          style: simple
+          explode: false
+          schema:
+            minimum: 1
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Result"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: RampsTriggers
+  /sweepTriggerArm/{enable}:
+    post:
+      tags:
+        - Ramps & Triggers
+      summary: Enable/Disable the sweep trigger
+      description: Set `true` to enable the sweeps to fire and `false` to disable
+      operationId: set_sweepTrigEnable
+      parameters:
+        - $ref: "#/components/parameters/enable"
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Result"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: RampsTriggers
+  /shutterTime/{mode}:
+    post:
+      tags:
+        - Ramps & Triggers
+      summary: Set the mechanical shutter exposure time
+      description:
+        There are three timing modes - `ccd` follows the CCD timing; `closed`
+        keeps the shutter closed, and `timed` sets the shutter to the query-specified
+        time in msec
+      operationId: set_shutterTime
+      parameters:
+        - name: mode
+          in: path
+          description: The shutter timing mode.
+          required: true
+          style: simple
+          explode: false
+          schema:
+            type: string
+            enum:
+              - ccd
+              - closed
+              - timed
+        - name: time_msec
+          in: query
+          description:
+            Shutter time in integer msec; Used only when `mode` = timed.  minimum
+            is 2 msec (Devnote - I would rather this a path parameter, but they have
+            to be 'required' and there is no way to make dependencies in Swagger)
+          required: false
+          style: form
+          explode: true
+          schema:
+            maximum: 1000
+            minimum: 2
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Result"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: RampsTriggers
+  /sweepStatus:
+    get:
+      tags:
+        - Ramps & Triggers
+      summary: Get all sweep (ramp & timing)-related system status values
+      description:
+        Gets the status of voltageEnable, voltageSetFocus, and cathodeGating.
+        The Example Value Schema for the 200 response documents the results. Note
+        that the parameter simMode = True only when the API has been configured to
+        run in Simulation mode (API mocking)
+      operationId: get_sweepStatus
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/inline_response_200_3"
+      x-swagger-router-controller: RampsTriggers
+    x-swagger-router-controller: DotNET
+  /camImageConfig:
+    post:
+      tags:
+        - Imaging Camera
+      summary: Configure the camera binning, etc.
+      description: Configure the camera binning, etc.
+      operationId: set_camImageConfig
+      requestBody:
+        description: Optional description in *Markdown*
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/body"
+        required: true
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Result"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /camHTSTrig/{enable}:
+    post:
+      tags:
+        - Imaging Camera
+      summary: Configure HTS triggering
+      description: Configure HTS triggering
+      operationId: set_camHTSTrig
+      parameters:
+        - $ref: "#/components/parameters/enable"
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Result"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /camChiller/{enable}:
+    post:
+      tags:
+        - Imaging Camera
+      summary: Turn On/Off the camera chiller
+      description: Set `true` to turn chiller *ON* and `false` to turn chiller *OFF*
+      operationId: set_camChiller
+      parameters:
+        - $ref: "#/components/parameters/enable"
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Result"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /camStatus:
+    get:
+      tags:
+        - Imaging Camera
+      summary: Get camera status parameters
+      description: Get camera status parameters
+      operationId: get_camStatus
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Result"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /sysSendCmd/{cmdTarget}:
+    post:
+      tags:
+        - Modes & Status
+      summary: Send a text command to the targeted device that is interfaced to ROSS
+      description:
+        The electronics (?) has a low-level text interface that controls
+        voltages, relays and other non-camera functions. The low-level commands are
+        listed in document "P510GEPCMDSb_Ver_3_20.xls", and allow complete control
+        of the device, albeit at a low level.  Sending commands directly can cause
+        the GUI to appear out of sync with the actual state of the machine.
+      operationId: set_SendCmd
+      parameters:
+        - name: cmdTarget
+          in: path
+          description: The target device for the command
+          required: true
+          style: simple
+          explode: false
+          schema:
+            type: string
+            enum:
+              - GEP
+              - (Reserved_1)
+              - (Reserved_2)
+      requestBody:
+        description:
+          Send the text command `cmdString` and optional array of parameters
+          `cmdParam`.  For the GEP `cmdParam` is not required and will be ignored.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/body_1"
+        required: true
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Result"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: ModesStatus
+  /sysDefault:
+    post:
+      tags:
+        - Modes & Status
+      summary: Set streak camera to a FACTORY DEFAULT state
+      description:
+        "Set streak camera to a **factory default** state:\n  * Turn off\
+        \ all high voltages\n  * Set to GEP to OPERATE mode.\n  * Change to Ramp Speed\
+        \ 1\n  * Set Cathode, Focus to defaults set in the GEPInit.ini file [General]\
+        \ section, with the keys: \"NormalCathodeVoltage\" and \"NormalFocusVoltage\"\
+        , respectively.\n  *  Set the Shutter to CCD mode.\n  * Enable Sweep trigger\n\
+        \  * Enable External trigger\n  * Enable Gated Cathode Mode (if streak camera\
+        \ supports this mode).\n  \n"
+      operationId: set_sysDefault
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Result"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: ModesStatus
+  /simMode/{enable}:
+    post:
+      tags:
+        - Modes & Status
+      summary: Enable/Disable the API in simulation (mocking) mode
+      description: Enables (`true`) or Disables (`false`) API simulation mode.  If *enabled*, the API will not communicate with the ROSS, but instead will return realistic responses for testing purposes.  When *disabled*, the API interfaces to the ROSS system.
+      operationId: set_simMode
+      parameters:
+        - $ref: "#/components/parameters/enable"
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/voltageEnable"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-swagger-router-controller: Voltages
+components:
+  schemas:
+    voltageEnable:
+      required:
+        - bias
+        - cathode
+        - sweep
+      type: object
+      properties:
+        bias:
+          type: boolean
+        cathode:
+          type: boolean
+        sweep:
+          type: boolean
+      example:
+        bias: true
+        cathode: true
+        sweep: true
+    voltageSetPoints:
+      type: object
+      properties:
+        cathode:
+          type: number
+        focus:
+          type: number
+        slot:
+          type: number
+        bias_1:
+          type: number
+        bias_2:
+          type: number
+        sweep_1:
+          type: number
+        sweep_2:
+          type: number
+      example:
+        cathode: 12500
+        focus: 0
+        slot: 100
+        bias_1: 1000
+        bias_2: -4600
+        sweep_1: 1000
+        sweep_2: 1000
+    voltageMeasured:
+      type: object
+      properties:
+        cathode:
+          type: number
+        focus:
+          type: number
+        slot:
+          type: number
+        bias_1:
+          type: number
+        bias_2:
+          type: number
+        sweep_1:
+          type: number
+        sweep_2:
+          type: number
+      example:
+        cathode: 12500
+        focus: 0
+        slot: 100
+        bias_1: 1000
+        bias_2: -4600
+        sweep_1: 1000
+        sweep_2: 1000
+    sweepStatus:
+      type: object
+      properties:
+        sweepFired:
+          type: boolean
+        rampIndex:
+          type: integer
+        sweepEnabled:
+          type: boolean
+        sweepTrigExternal:
+          type: boolean
+      example:
+        sweepFired: false
+        rampIndex: 1
+        sweepEnabled: true
+        sweepTrigExternal: true
+    simMode:
+      type: boolean
+      example: false
+    cathodeGating:
+      type: boolean
+      example: true
+    Result:
+      required:
+        - cmdStatus
+      type: object
+      properties:
+        cmdStatus:
+          type: string
+        cmdReturn:
+          type: string
+      example:
+        cmdStatus: OK
+        cmdReturn: String returned by specific command
+    Error:
+      required:
+        - code
+        - message
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+    inline_response_200:
+      type: object
+      properties:
+        enabledHV:
+          $ref: "#/components/schemas/voltageEnable"
+        setpointsHV:
+          $ref: "#/components/schemas/voltageSetPoints"
+        measuredHV:
+          $ref: "#/components/schemas/voltageMeasured"
+        sweepStatus:
+          $ref: "#/components/schemas/sweepStatus"
+        cathodeGating:
+          $ref: "#/components/schemas/cathodeGating"
+        simMode:
+          $ref: "#/components/schemas/simMode"
+      example:
+        setpointsHV:
+          cathode: 12500
+          focus: 0
+          slot: 100
+          bias_1: 1000
+          bias_2: -4600
+          sweep_1: 1000
+          sweep_2: 1000
+        measuredHV:
+          cathode: 12500
+          focus: 0
+          slot: 100
+          bias_1: 1000
+          bias_2: -4600
+          sweep_1: 1000
+          sweep_2: 1000
+        simMode: false
+        enabledHV:
+          bias: true
+          cathode: true
+          sweep: true
+        cathodeGating: true
+        sweepStatus:
+          sweepFired: false
+          rampIndex: 1
+          sweepEnabled: true
+          sweepTrigExternal: true
+    body:
+      type: object
+      properties:
+        enabledHV:
+          $ref: "#/components/schemas/voltageEnable"
+        setpointsHV:
+          $ref: "#/components/schemas/voltageSetPoints"
+        measuredHV:
+          $ref: "#/components/schemas/voltageMeasured"
+        sweepStatus:
+          $ref: "#/components/schemas/sweepStatus"
+        cathodeGating:
+          $ref: "#/components/schemas/cathodeGating"
+        simMode:
+          $ref: "#/components/schemas/simMode"
+      example:
+        setpointsHV:
+          cathode: 12500
+          focus: 0
+          slot: 100
+          bias_1: 1000
+          bias_2: -4600
+          sweep_1: 1000
+          sweep_2: 1000
+        measuredHV:
+          cathode: 12500
+          focus: 0
+          slot: 100
+          bias_1: 1000
+          bias_2: -4600
+          sweep_1: 1000
+          sweep_2: 1000
+        simMode: false
+        enabledHV:
+          bias: true
+          cathode: true
+          sweep: true
+        cathodeGating: true
+        sweepStatus:
+          sweepFired: false
+          rampIndex: 1
+          sweepEnabled: true
+          sweepTrigExternal: true
+    inline_response_200_1:
+      type: object
+      properties:
+        cathodeGating:
+          $ref: "#/components/schemas/cathodeGating"
+      example:
+        cathodeGating: true
+    inline_response_200_2:
+      type: object
+      properties:
+        enabledHV:
+          $ref: "#/components/schemas/voltageEnable"
+        setpointsHV:
+          $ref: "#/components/schemas/voltageSetPoints"
+        measuredHV:
+          $ref: "#/components/schemas/voltageMeasured"
+        cathodeGating:
+          $ref: "#/components/schemas/cathodeGating"
+        simMode:
+          $ref: "#/components/schemas/simMode"
+      example:
+        setpointsHV:
+          cathode: 12500
+          focus: 0
+          slot: 100
+          bias_1: 1000
+          bias_2: -4600
+          sweep_1: 1000
+          sweep_2: 1000
+        measuredHV:
+          cathode: 12500
+          focus: 0
+          slot: 100
+          bias_1: 1000
+          bias_2: -4600
+          sweep_1: 1000
+          sweep_2: 1000
+        simMode: false
+        enabledHV:
+          bias: true
+          cathode: true
+          sweep: true
+        cathodeGating: true
+    inline_response_200_3:
+      type: object
+      properties:
+        sweepStatus:
+          $ref: "#/components/schemas/sweepStatus"
+        measuredVolts:
+          $ref: "#/components/schemas/voltageMeasured"
+        cathodeGating:
+          $ref: "#/components/schemas/cathodeGating"
+        simMode:
+          $ref: "#/components/schemas/simMode"
+      example:
+        measuredVolts:
+          cathode: 12500
+          focus: 0
+          slot: 100
+          bias_1: 1000
+          bias_2: -4600
+          sweep_1: 1000
+          sweep_2: 1000
+        simMode: false
+        cathodeGating: true
+        sweepStatus:
+          sweepFired: false
+          rampIndex: 1
+          sweepEnabled: true
+          sweepTrigExternal: true
+    body_1:
+      type: object
+      properties:
+        cmdString:
+          type: string
+        cmdParam:
+          type: array
+          items:
+            type: string
+          default: []
+      example:
+        cmdString: RB
+        cmdParam: []
+  parameters:
+    enable:
+      name: enable
+      in: path
+      description: "`true` = enable `false` = disable"
+      required: true
+      schema:
+        type: boolean
+        enum:
+          - true
+          - false
